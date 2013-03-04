@@ -1,0 +1,134 @@
+;   80512 processor definition file
+;   ===============================
+; special function register of c8051f33x
+
+
+   CKCON	equ  8Eh   ; /* CLOCK CONTROL */
+   PSCTL	equ  8Fh   ; /* PROGRAM STORE R/W CONTROL */
+  TMR3CN	equ  91h   ; /* TIMER 3 CONTROL */
+ TMR3RLL	equ  92h   ; /* TIMER 3 CAPTURE REGISTER - LOW BYTE */
+ TMR3RLH	equ  93h   ; /* TIMER 3 CAPTURE REGISTER - HIGH BYTE */
+   TMR3L	equ  94h   ; /* TIMER 3 - LOW BYTE */
+   TMR3H	equ  95h   ; /* TIMER 3 - HIGH BYTE */
+   IDA0L	equ  96h   ; /* CURRENT MODE DAC 0 - LOW BYTE */
+   IDA0H	equ  97h   ; /* CURRENT MODE DAC 0 - HIGH BYTE */
+   SCON0	equ  98h   ; /* SERIAL PORT CONTROL */
+   SBUF0	equ  99h   ; /* SERIAL PORT BUFFER */
+  CPT0CN	equ  9Bh   ; /* COMPARATOR 0 CONTROL */
+  CPT0MD	equ  9Dh   ; /* COMPARATOR 0 MODE SELECTION */
+  CPT0MX	equ  9Fh   ; /* COMPARATOR 0 MUX SELECTION */
+ SPI0CFG	equ  0A1h   ; /* SPI0 CONFIGURATION */
+ SPI0CKR	equ  0A2h   ; /* SPI0 CLOCK RATE CONTROL */
+ SPI0DAT	equ  0A3h   ; /* SPI0 DATA */
+ P0MDOUT	equ  0A4h   ; /* PORT 0 OUTPUT MODE CONFIGURATION */
+ P1MDOUT	equ  0A5h   ; /* PORT 1 OUTPUT MODE CONFIGURATION */
+ P2MDOUT	equ  0A6h   ; /* PORT 2 OUTPUT MODE CONFIGURATION */
+  CLKSEL	equ  0A9h   ; /* SYSTEM CLOCK SELECT */
+  EMI0CN	equ  0AAh   ; /* EXTERNAL MEMORY INTERFACE CONTROL */
+  _XPAGE	equ  0AAh   ; /* XDATA/PDATA PAGE */
+  OSCXCN	equ  0B1h   ; /* EXTERNAL OSCILLATOR CONTROL */
+  OSCICN	equ  0B2h   ; /* INTERNAL OSCILLATOR CONTROL */
+  OSCICL	equ  0B3h   ; /* INTERNAL OSCILLATOR CALIBRATION */
+   FLSCL	equ  0B6h   ; /* FLASH MEMORY TIMING PRESCALER */
+   FLKEY	equ  0B7h   ; /* FLASH ACESS LIMIT */
+  IDA0CN	equ  0B9h   ; /* CURRENT MODE DAC 0 - CONTROL */
+   AMX0N	equ  0BAh   ; /* ADC 0 MUX NEGATIVE CHANNEL SELECTION */
+   AMX0P	equ  0BBh   ; /* ADC 0 MUX POSITIVE CHANNEL SELECTION */
+  ADC0CF	equ  0BCh   ; /* ADC 0 CONFIGURATION */
+   ADC0L	equ  0BDh   ; /* ADC 0 DATA WORD LSB */
+   ADC0H	equ  0BEh   ; /* ADC 0 DATA WORD MSB */
+  SMB0CN	equ  0C0h   ; /* SMBUS CONTROL */
+  SMB0CF	equ  0C1h   ; /* SMBUS CONFIGURATION */
+ SMB0DAT	equ  0C2h   ; /* SMBUS DATA */
+ ADC0GTL	equ  0C3h   ; /* ADC 0 GREATER-THAN LOW BYTE */
+ ADC0GTH	equ  0C4h   ; /* ADC 0 GREATER-THAN HIGH BYTE */
+ ADC0LTL	equ  0C5h   ; /* ADC 0 LESS-THAN LOW BYTE */
+ ADC0LTH	equ  0C6h   ; /* ADC 0 LESS-THAN HIGH BYTE */
+  TMR2CN	equ  0C8h   ; /* TIMER 2 CONTROL */
+ TMR2RLL	equ  0CAh   ; /* TIMER 2 CAPTURE REGISTER - LOW BYTE */
+ TMR2RLH	equ  0CBh   ; /* TIMER 2 CAPTURE REGISTER - HIGH BYTE */
+   TMR2L	equ  0CCh   ; /* TIMER 2 - LOW BYTE */
+   TMR2H	equ  0CDh   ; /* TIMER 2 - HIGH BYTE */
+  REF0CN	equ  0D1h   ; /* VOLTAGE REFERENCE 0 CONTROL */
+  P0SKIP	equ  0D4h   ; /* PORT 0 SKIP */
+  P1SKIP	equ  0D5h   ; /* PORT 1 SKIP */
+  P2SKIP	equ  0D6h   ; /* PORT 2 SKIP */
+ SMB0ADR	equ  0D7h   ; /* SMBUS SLAVE ADDRESS */
+  PCA0CN	equ  0D8h   ; /* PCA CONTROL */
+  PCA0MD	equ  0D9h   ; /* PCA MODE */
+PCA0CPM0	equ  0DAh   ; /* PCA MODULE 0 MODE REGISTER */
+PCA0CPM1	equ  0DBh   ; /* PCA MODULE 1 MODE REGISTER */
+PCA0CPM2	equ  0DCh   ; /* PCA MODULE 2 MODE REGISTER */
+    XBR0	equ  0E1h   ; /* PORT MUX CONFIGURATION REGISTER 0 */
+    XBR1	equ  0E2h   ; /* PORT MUX CONFIGURATION REGISTER 1 */
+  OSCLCN	equ  0E3h   ; /* LOW-FREQUENCY OSCILLATOR CONTROL */
+  IT01CF	equ  0E4h   ; /* INT0/INT1 CONFIGURATION REGISTER */
+ INT01CF	equ  0E4h   ; /* INT0/INT1 CONFIGURATION REGISTER */
+    EIE1	equ  0E6h   ; /* EXTERNAL INTERRUPT ENABLE 1 */
+ SMB0ADM	equ  0E7h   ; /* SMBUS SLAVE ADDRESS MASK */
+  ADC0CN	equ  0E8h   ; /* ADC 0 CONTROL */
+PCA0CPL1	equ  0E9h   ; /* PCA CAPTURE 1 LOW */
+PCA0CPH1	equ  0EAh   ; /* PCA CAPTURE 1 HIGH */
+PCA0CPL2	equ  0EBh   ; /* PCA CAPTURE 2 LOW */
+PCA0CPH2	equ  0ECh   ; /* PCA CAPTURE 2 HIGH */
+   P1MAT	equ  0EDh   ; /* PORT 1 MATCH REGISTER */
+  P1MASK	equ  0EEh   ; /* PORT 1 MASK REGISTER */
+  RSTSRC	equ  0EFh   ; /* RESET SOURCE */
+  P0MODE	equ  0F1h   ; /* PORT 0 INPUT MODE CONFIGURATION */
+  P0MDIN	equ  0F1h   ; /* PORT 0 INPUT MODE CONFIGURATION */
+  P1MODE	equ  0F2h   ; /* PORT 1 INPUT MODE CONFIGURATION */
+  P1MDIN	equ  0F2h   ; /* PORT 1 INPUT MODE CONFIGURATION */
+  P2MDIN	equ  0F3h   ; /* PORT 2 INPUT MODE */
+    EIP1	equ  0F6h   ; /* EXTERNAL INTERRUPT PRIORITY REGISTER 1 */
+ PCA0PWM	equ  0F7h   ; /* PCA PWM CONFIGURATION */
+  SPI0CN	equ  0F8h   ; /* SPI0 CONTROL */
+   PCA0L	equ  0F9h   ; /* PCA COUNTER LOW */
+   PCA0H	equ  0FAh   ; /* PCA COUNTER HIGH */
+PCA0CPL0	equ  0FBh   ; /* PCA CAPTURE 0 LOW */
+PCA0CPH0	equ  0FCh   ; /* PCA CAPTURE 0 HIGH */
+   P0MAT	equ  0FDh   ; /* PORT 0 MATCH REGISTER */
+  P0MASK	equ  0FEh   ; /* PORT 0 MASK REGISTER */
+  VDM0CN	equ  0FFh   ; /* VDD MONITOR CONTROL */
+
+; bit definition
+CF			bit		PCA0CN.7
+CR			bit		PCA0CN.6
+CCF2		bit		PCA0CN.2
+CCF1		bit		PCA0CN.1
+CCF0		bit		PCA0CN.0
+  
+;
+;	Register/Memory Equates
+;
+rb0r0	equ	0
+rb0r1	equ	1
+rb0r2	equ	2
+rb0r3	equ	3
+rb0r4	equ	4
+rb0r5	equ	5
+rb0r6	equ	6
+rb0r7	equ	7
+rb1r0	equ	8
+rb1r1	equ	9
+rb1r2	equ	0ah
+rb1r3	equ	0bh
+rb1r4	equ	0ch
+rb1r5	equ	0dh
+rb1r6	equ	0eh
+rb1r7	equ	0fh
+rb2r0	equ	10h
+rb2r1	equ	11h
+rb2r2	equ	12h
+rb2r3	equ	13h
+rb2r4	equ	14h
+rb2r6	equ	16h
+rb2r7	equ	17h
+rb3r0	equ	18h
+rb3r1	equ	19h
+rb3r2	equ	1ah
+rb3r3	equ	1bh
+rb3r4	equ	1ch
+rb3r5	equ	1dh
+rb3r6	equ	1eh
+rb3r7	equ	1fh
+
