@@ -1,0 +1,27 @@
+产品编程盒中的编码有 16位的字节组成。
+[12-15]:类型0001
+[8-11]:类型编号 
+Aircraft:	00010001	1
+Heli:		00010010	2
+Car:		00010011	3
+Boat:		00010100	4
+Other:		00011111	15
+
+10A,20A,30A,40A,50A,60A,70A,80A,100A,200A,200+
+
+
+Aircraft
+	10A
+		brake
+			on/off
+Heli
+Vehicle
+	10A
+		reverse
+			no,25%,50%,100%
+Boat
+	10A
+		reverse
+			no,25%,50%,100%
+Ohter
+	N/A
