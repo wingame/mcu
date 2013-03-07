@@ -4,8 +4,13 @@
 ;
 
 ; NOTE:code page 0090h was accessed by program, IT'S REALLY CONFUSE ME.
-
 ; 自适应行程，高杆和低杆不启动，直到中杆位置出现50个RCP周期，SETTING键无效化
+
+; 压缩版，程序体积小与8k
+
+; 2013-3-7, break_point处让红色LED闪烁
+; x25cc_start_loop 开始根据 motor_status 选择马达的行为，
+; 这个值由 x2e69_verify_rcp 方法中根据杆位改变
 
 $NOPAGING
 $NOTABS
@@ -5052,6 +5057,7 @@ X2b44:
 	clr		c		; 2b46   c3         C
 	subb	a,#0ah		; 2b47   94 0a      ..
 	jc		X2b51		; 2b49   40 06      @.
+; 在从启动就急加速度时候有可能会跳到这里。
 	ljmp	break_point
 	lcall	x2816_cfg_according_params		; 2b4b   12 28 16   .(.
 	ljmp	x25a3_control_start		; 2b4e   02 25 a3   .%#
