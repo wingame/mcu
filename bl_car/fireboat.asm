@@ -9,6 +9,13 @@
 ; ADC VOLTAGE MAX(ATMega 48) = 1.1v
 
 
+; 2013-3-24
+; 修正：中杆，关闭发射机时，由于干扰，会偶尔发生电机异常启动然后停机的现象，
+; 		专为这个BUG，添加了返回bad rcp的机制。用于判断连续的正常RCP。
+;		修改了 
+;		1. evaluate_rcp0中由停止到启动的逻辑。
+;		2. int0中断中断rcp接收增加了rcp0_cycle
+;		3. rcp0_updated方法
 
 .include "m48def.inc"
 
@@ -73,7 +80,9 @@
 .equ	rcp0_ready			= 2
 .equ	enabled_water_pump	= 3
 .equ	full_power			= 4
-.equ	power_failed			= 5
+.equ	power_failed		= 5
+.equ	rcp0_cycle			= 6
+.equ	rcp0_pre_run		= 7
 
 .macro	commit_pwm
 	sts		OCR1AH,@1
@@ -128,7 +137,11 @@ mem_temp1:		.byte 1
 mem_rcp0_temp:	.byte 2
 mem_rcp1_temp:	.byte 2
 
-
+; count good rcp0 in continusouly
+mem_rcp0_count:	.byte 1
+mem_run_confirm_count: .byte 1
+.equ		GOOD_RCP0_COUNT= 4
+.equ		RUN_CONFIRM_COUNT=4
 
 mem_a:			.byte 2
 mem_b:			.byte 2
@@ -275,8 +288,10 @@ int0_1:
 	sbr		r23,(1<<ISC01)
 	cbr		r23,(1<<ISC00)
 	sts		EICRA,r23
+	cbi		GPIOR0,rcp0_ready
 	rjmp	int0_exit
 int0_2:
+	sbi		GPIOR0,rcp0_cycle
 	lds		r23,EICRA
 	sbr		r23,(1<<ISC01)+(1<<ISC00)
 	sts		EICRA,r23
@@ -289,7 +304,7 @@ int0_2:
 	subi	r20,low(RCP_MAX_X-RCP_MIN_X)
 	sbci	r21,high(RCP_MAX_X-RCP_MIN_X)
 	brcs	int0_rcp0_ready
-	cbi		GPIOR0,rcp0_ready
+;	cbi		GPIOR0,rcp0_ready
 	rjmp	int0_exit
 int0_rcp0_ready:
 	ldi		r20,RCP_ERROR_COUNT
@@ -458,21 +473,23 @@ fnp_1:
 ;	movw	r16,rcp0_l
 ;	rcall	save_word
 ;	rjmp	data_to_eep
-	cbi		GPIOR0,motor_reverse
-	ldi		r16,low(1600)
-	ldi		r17,high(1600)
-	commit_pwm r16,r17
-	resume_t1 r16
-	rcall	short_delay
-	rcall	short_delay
+;	cbi		GPIOR0,motor_reverse
+;	ldi		r16,low(1600)
+;	ldi		r17,high(1600)
+;	commit_pwm r16,r17
+;	resume_t1 r16
+;	rcall	short_delay
+;	rcall	short_delay
+;	pause_t1 r16
+;	idle	r16
+;	rcall	short_delay
+;	sbi		GPIOR0,motor_reverse
+;	resume_t1 r16
+;	rcall	short_delay
+;	rcall	short_delay
 	pause_t1 r16
-	idle	r16
-	rcall	short_delay
-	sbi		GPIOR0,motor_reverse
-	resume_t1 r16
-	rcall	short_delay
-	rcall	short_delay
-	pause_t1 r16
+	rcall	start_beep
+
 	idle	r16
 	sbi		GPIOR0,enabled_water_pump
 main_loop:
@@ -487,6 +504,20 @@ main_loop:
 ;	rjmp	main_loop
 ;	cbi		GPIOR0,rcp0_ready
 	rcall	rcp0_updated
+	sbis	GPIOR0,rcp0_ready
+	rjmp	bad_rcp0
+good_rcp0:
+	lds		r16,mem_rcp0_count
+	and		r16,r16
+	breq	ml_0
+	dec		r16
+	sts		mem_rcp0_count,r16
+	rjmp	ml_0
+bad_rcp0:
+	ldi		r16,GOOD_RCP0_COUNT
+	sts		mem_rcp0_count,r16
+	rjmp	ml_3
+ml_0:	
 	and		idle_cnt,idle_cnt
 	breq	ml_1
 	dec		idle_cnt
@@ -501,8 +532,22 @@ ml_1:
 ml_motor_idle:
 	pause_t1 r16
 	idle	r16
+
+; 马达停止时，一直重置停止计数器。
+	
+	sbic	GPIOR0,rcp0_pre_run
+	rjmp	main_loop
+ml_3:
+	; RCP信号错误和中杆位置都会一直重置这个值。
+	ldi		r16,RUN_CONFIRM_COUNT
+	sts		mem_run_confirm_count,r16
+
 	rjmp	main_loop
 ml_motor_engage:
+; confirm run motor
+	
+
+
 	commit_pwm pwm_duty_l,pwm_duty_h
 	resume_t1 r16
 	rjmp	main_loop
@@ -529,9 +574,9 @@ rcp0_updated:
 	pop		r16
 	rjmp	rcp0_lost
 ru_1:
-	sbis	GPIOR0,rcp0_ready
+	sbis	GPIOR0,rcp0_cycle
 	rjmp	rcp0_updated
-	cbi		GPIOR0,rcp0_ready
+	cbi		GPIOR0,rcp0_cycle
 	ret
 
 infinity:
@@ -596,7 +641,7 @@ init_adc7:
 
 check_battery:
 ;	sbi		GPIOR0,enabled_water_pump
-;	ret
+	ret
 	ldi		r16,5
 	cp		battery_check_cnt,r16
 	brcs	check_battery_exit
@@ -708,15 +753,29 @@ go_idle:
 	ldi		r16,IDLE_COUNT
 	mov		idle_cnt,r16
 	sbi		GPIOR0,motor_idle
+	cbi		GPIOR0,rcp0_pre_run
 	rjmp	eva_rcp0_exit
 rcp_low_pos:
 ; rcp0 low position
-	sbic	GPIOR0,motor_reverse
-	rjmp	go_reverse
 	sbis	GPIOR0,motor_idle
-	rjmp	go_idle
+	rjmp	r_check_dir
 	and		idle_cnt,idle_cnt
+	breq	pre_reverse
+	rjmp	eva_rcp0_exit
+r_check_dir:
+
+	sbis	GPIOR0,motor_reverse
+	rjmp	go_idle
+	rjmp	go_reverse
+	
+pre_reverse:
+	; 上次状态为停止。在转动马达之前需要确认是否是干扰
+	sbi		GPIOR0,rcp0_pre_run
+	lds		r16,mem_run_confirm_count
+	and		r16,r16
 	breq	go_reverse
+	dec		r16
+	sts		mem_run_confirm_count,r16
 	rjmp	eva_rcp0_exit
 go_reverse:
 	sbi		GPIOR0,motor_reverse
@@ -748,12 +807,27 @@ g_rev_1:
 	rjmp	calc_pwm
 high_rcp:
 ; rcp0 high position
+	sbis	GPIOR0,motor_idle
+	rjmp	f_check_dir
+	and		idle_cnt,idle_cnt
+	breq	pre_forward
+	rjmp	eva_rcp0_exit
+pre_forward:
+	; 上次状态为停止。在转动马达之前需要确认是否是干扰
+	sbi		GPIOR0,rcp0_pre_run
+	lds		r16,mem_run_confirm_count
+	and		r16,r16
+	breq	go_forward
+	dec		r16
+	sts		mem_run_confirm_count,r16
+	rjmp	eva_rcp0_exit	
+f_check_dir:
 	sbis	GPIOR0,motor_reverse
 	rjmp	go_forward
-	sbis	GPIOR0,motor_idle
 	rjmp	go_idle
-	and		idle_cnt,idle_cnt
-	brne	eva_rcp0_exit
+
+
+
 go_forward:
 	cbi		GPIOR0,motor_reverse
 	ldi		r16,low(RCP_MAX)
@@ -867,6 +941,49 @@ ld_1:
 	sts		mem_temp1,r16
 	brne	ld_1
 	ret
+
+ss_delay:
+	ldi		r17,150
+ss_1:
+	dec		r17
+	and		r17,r17
+	brne	ss_1
+	ret
+.equ	BEEP_IDLE =10
+.equ	BEEP_LONG=200
+start_beep:
+	ldi		r18,BEEP_LONG
+sb_fd:
+	forward r16
+	rcall	ss_delay
+	idle	r16
+	ldi		r16,BEEP_IDLE
+sb_1:
+	dec		r16
+	breq	sb_r
+	rcall	ss_delay
+	rjmp	sb_1
+
+sb_r:
+
+	reverse	r16
+	rcall	ss_delay
+	idle	r16
+	ldi		r16,BEEP_IDLE
+sb_3:
+	dec		r16
+	breq	sb_4
+	rcall	ss_delay
+	rjmp	sb_3
+sb_4:
+
+
+	dec		r18
+	and		r18,r18
+	brne	sb_fd
+
+	ret
+
 
 save_word:
 	lds		r18,mem_debug_idx
