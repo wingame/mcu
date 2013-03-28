@@ -17,6 +17,11 @@
 ;		2. int0中断中断rcp接收增加了rcp0_cycle
 ;		3. rcp0_updated方法
 
+; 2013-3-28
+; 1. 中杆检测修正。从原来等rcp0_cycle改为rcp0_ready.
+; 2. 信号丢失后，有2声提示。
+; 3. 改进开机声音的效果
+
 .include "m48def.inc"
 
 .def	zero		= r0
@@ -444,15 +449,33 @@ reset:
 ;stop: rjmp stop
 ;debug end **************************************************
 
-
+	rcall	long_delay
+	rcall	start_beep
 
 	sei
+	ldi		r16,RCP_ERROR_COUNT
+	out		GPIOR1,r16
+
 rcp0_resume:
 	ldi		r17,50
 find_nuetral_pos:
 	rcall	rcp0_updated
-;	sbis	GPIOR0,rcp0_ready
-;	rjmp	find_nuetral_pos
+
+	sbis	GPIOR0,rcp0_ready
+	rjmp	find_nuetral_pos
+
+	; debug
+;	cli
+;	clr		r18
+;	clr		r19
+;	mov		r16,rcp0_l
+;	rcall	eep_write
+;	ldi		r18,1
+;	mov		r16,rcp0_h
+;	rcall	eep_write
+;	rjmp	break_point
+	; debug end
+
 ;	cbi		GPIOR0,rcp0_ready
 	movw	r18,rcp0_l
 	subi	r18,low(RCP_MID_L)
@@ -557,6 +580,9 @@ rcp0_lost:
 	cbi		PORTD,WATER_PUMP
 	pause_t1 r16
 	idle	r16
+	rcall	start_beep
+	rcall	short_delay
+	rcall	start_beep
 	ldi		r16,50
 rcp0_lost_1:
 	sbis	GPIOR0,rcp0_ready
@@ -1017,6 +1043,12 @@ dte_1:
 	
 break_point:
 	cli
+	sbi		PORTD,WATER_PUMP
+xxxx:
+	rcall	long_delay
+	rcall	start_beep
+	rjmp	xxxx
+.if 1=2
 loop:
 	rcall	long_delay
 	sbis	PORTD,WATER_PUMP
@@ -1026,6 +1058,7 @@ loop:
 sw1:
 	sbi		PORTD,WATER_PUMP
 	rjmp	loop
+.endif
 
 debug_adc:
 	push	r16
