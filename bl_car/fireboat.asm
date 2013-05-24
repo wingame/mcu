@@ -1,11 +1,11 @@
 ; fireboat.asm
 ; 关闭了电压保护
 ;        +---------+         +---------+
-;  Vcc---|  R1:47K |----+----| R2:2k   |----| GND
+;  Vcc---|  R1:47K |----+----| R2:4.7k |----| GND
 ;        +---------+    |    +---------+
 ;                   ---------
 ;                   ADC input
-; max voltage = ADC voltage max / R1 * (R1+R2) = 1.1 / 2 * (47 + 2) = 26.95v
+; max voltage = ADC voltage max / R1 * (R1+R2) = 1.1 / 4.7 * (47 + 4.7) = 12.1V
 ; ADC VOLTAGE MAX(ATMega 48) = 1.1v
 
 
@@ -22,6 +22,17 @@
 ; 2. 信号丢失后，有2声提示。
 ; 3. 改进开机声音的效果
 
+
+; 2013-4-28
+; 1 增加使用 3.0 RCP 信号校准9伏电压
+; 2 增加9V电压保护
+
+; 2013-5-17
+; 1 修改 3.0 RCP 信号校准为10.2伏
+; 2 增加到10.2伏马达变化转动
+;   增加标记 lagging. 表示马达正在缓慢转动。
+; 3 9V电压马达停转保护不变
+; 4 电压取样该为 47k:4.7k
 .include "m48def.inc"
 
 .def	zero		= r0
@@ -31,10 +42,10 @@
 .def	rcp0_l		= r4
 .def	rcp0_h		= r5
 .def	battery_check_cnt = r6
-;def	rcp1_resume_cnt = r7
+.def	tcnt2h		= r7
 
-.def	pwm_duty_l	=r10
-.def	pwm_duty_h	=r11
+.def	pwm_duty_l	= r10
+.def	pwm_duty_h	= r11
 
 ;PORTB
 .equ	FORWARD_N1	= 0
@@ -50,16 +61,22 @@
 
 
 ;.equ	SHUTDOWN_VOLT = 190		; 5V
-.equ	PROTECT_VOLT = 	387		; 10.2V
+;.equ	LAGGING_VOLT = 	387		; 10.2V
+.equ	PROTECT_VOLT = 	762		; 9V
 
 
 .equ	PWM_TOP		= 4194
 
-.equ	PWM_MIN		= 335
+;.equ	PWM_MIN		= 335
+
+.equ	PWM_LAGGING	= 400
 
 
 ;.equ	SETTING_RCP_H = 26000		;3100
 ;.equ	SETTING_RCP_L = 24326		;2900
+
+.equ	DETECT_SIGNAL_L = 24000		; 3000
+.equ	DETECT_SIGNAL_H = 27000		; 3000
 
 .equ	RCP_MAX_X	= 19293			;2300
 .equ	RCP_MIN_X	= 5872			;700
@@ -84,7 +101,7 @@
 .equ	motor_idle			= 1
 .equ	rcp0_ready			= 2
 .equ	enabled_water_pump	= 3
-.equ	full_power			= 4
+.equ	lagging				= 4
 .equ	power_failed		= 5
 .equ	rcp0_cycle			= 6
 .equ	rcp0_pre_run		= 7
@@ -148,6 +165,8 @@ mem_run_confirm_count: .byte 1
 .equ		GOOD_RCP0_COUNT= 4
 .equ		RUN_CONFIRM_COUNT=4
 
+mem_lagging_volt: .byte 2
+
 mem_a:			.byte 2
 mem_b:			.byte 2
 mem_c:			.byte 2
@@ -157,6 +176,8 @@ mem_rcp0_neutral: .byte 2
 mem_rcp1:		.byte 2		; water pump rcp value
 mem_shutdown_cnt: .byte 1
 .equ		SHUTDOWN_COUNT = 10
+
+mem_tcnt2x:		.byte 1
 
 
 ;mem_rcp0_err_cnt:	.byte 1
@@ -181,7 +202,7 @@ mem_debug_idx:		.byte 1
 	Rjmp	WDT							;6 Watchdog Time-out Interrupt
 	Rjmp	TIMER2_COMPA				;7 Timer/Counter2 Compare Match A
 	Rjmp	TIMER2_COMPB				;8 Timer/Counter2 Compare Match B
-	Rjmp	TIMER2_OVF					;9 Timer/Counter2 Overflow
+	Rjmp	timer2_ovf					;9 Timer/Counter2 Overflow
 	Rjmp	TIMER1_CAPT					;a Timer/Counter1 Capture Event
 	Rjmp	timer1_compa				;b Timer/Counter1 Compare Match A
 	Rjmp	TIMER1_COMPB				;c Timer/Coutner1 Compare Match B
@@ -205,7 +226,7 @@ PCINT2_INT:
 WDT:
 TIMER2_COMPA:
 TIMER2_COMPB:
-TIMER2_OVF:
+
 TIMER1_CAPT:
 TIMER1_COMPB:
 TIMER0_COMPA:
@@ -221,6 +242,16 @@ SPM_READY:
 TIMER0_COMPB:
 	reti
 ; interrupts route ---------------------------------------------------------------
+timer2_ovf:
+	in		i_sreg,SREG
+	inc		tcnt2h
+;	ldi		r20,16		; 0.5 sec
+;	cp		tcnt2h,r20
+;	brcs	t2_ovf_exit
+;	clr		tcnt2h
+;t2_ovf_exit:
+	out		SREG,i_sreg
+	reti
 timer1_compa:
 	in		i_sreg,SREG
 	sbis	GPIOR0,motor_reverse
@@ -421,33 +452,12 @@ reset:
 	rcall	init_port
 	rcall	init_timer0
 	rcall	init_timer1
+	rcall	init_timer2
 	rcall	init_extint
 	rcall	init_adc7
 	
 	sts		mem_rcp0_neutral+1,zero
 
-;debug ******************************************************
-;PORTB
-;.equ	FORWARD_N1	= 0
-;.equ	FORWARD_N2	= 1
-;.equ	FORWARD_N3	= 2
-;PORTD
-;.equ	FORWARD_P	= 0
-;.equ	WATER_PUMP	= 5
-;.equ	REVERSE_P	= 1
-;;PORTC
-;.equ	REVERSE_N1	= 4
-;.equ	REVERSE_N2	= 5
-
-
-	sts		mem_debug_idx,zero
-;	sbi		PORTD,WATER_PUMP
-;	ldi		r16,0xff
-;	out		PORTB,r16
-;	out		PORTD,r16
-;	out		PORTc,r16
-;stop: rjmp stop
-;debug end **************************************************
 
 	rcall	long_delay
 	rcall	start_beep
@@ -455,28 +465,17 @@ reset:
 	sei
 	ldi		r16,RCP_ERROR_COUNT
 	out		GPIOR1,r16
+	rcall	detect30
 
 rcp0_resume:
 	ldi		r17,50
 find_nuetral_pos:
 	rcall	rcp0_updated
-
+	
 	sbis	GPIOR0,rcp0_ready
 	rjmp	find_nuetral_pos
 
-	; debug
-;	cli
-;	clr		r18
-;	clr		r19
-;	mov		r16,rcp0_l
-;	rcall	eep_write
-;	ldi		r18,1
-;	mov		r16,rcp0_h
-;	rcall	eep_write
-;	rjmp	break_point
-	; debug end
 
-;	cbi		GPIOR0,rcp0_ready
 	movw	r18,rcp0_l
 	subi	r18,low(RCP_MID_L)
 	sbci	r19,high(RCP_MID_L)
@@ -493,43 +492,17 @@ find_nuetral_pos:
 	sts		mem_rcp0_neutral,rcp0_l
 	sts		mem_rcp0_neutral+1,rcp0_h
 fnp_1:
-;	movw	r16,rcp0_l
-;	rcall	save_word
-;	rjmp	data_to_eep
-;	cbi		GPIOR0,motor_reverse
-;	ldi		r16,low(1600)
-;	ldi		r17,high(1600)
-;	commit_pwm r16,r17
-;	resume_t1 r16
-;	rcall	short_delay
-;	rcall	short_delay
-;	pause_t1 r16
-;	idle	r16
-;	rcall	short_delay
-;	sbi		GPIOR0,motor_reverse
-;	resume_t1 r16
-;	rcall	short_delay
-;	rcall	short_delay
+
 	pause_t1 r16
 	rcall	start_beep
 
 	idle	r16
 	sbi		GPIOR0,enabled_water_pump
+	cbi		GPIOR0,lagging
 main_loop:
-;debug **********************************************
-;	lds		r16,mem_debug_idx
-;	cpi		r16,100
-;	brne	xxxx
-;	rjmp	data_to_eep
-;xxxx:
-;debug end ******************************************
-;	sbis	GPIOR0,rcp0_ready
-;	rjmp	main_loop
-;	cbi		GPIOR0,rcp0_ready
 	rcall	rcp0_updated
 	sbis	GPIOR0,rcp0_ready
 	rjmp	bad_rcp0
-good_rcp0:
 	lds		r16,mem_rcp0_count
 	and		r16,r16
 	breq	ml_0
@@ -567,11 +540,21 @@ ml_3:
 
 	rjmp	main_loop
 ml_motor_engage:
-; confirm run motor
-	
-
-
+	sbis	GPIOR0,lagging
+	rjmp	normal_run
+	mov		r16,tcnt2h
+	sbrs	r16,5			; 计数器的第6为作为tag lagging. 即 2秒钟变化一次PWM
+	rjmp	normal_run
+	movw	r16,pwm_duty_l
+	lsr		r17
+	ror		r16
+	lsr		r17
+	ror		r16
+	commit_pwm r16,r17
+	rjmp	ml_4
+normal_run:
 	commit_pwm pwm_duty_l,pwm_duty_h
+ml_4:
 	resume_t1 r16
 	rjmp	main_loop
 
@@ -653,7 +636,20 @@ init_timer1:
 	ldi		r16,low(PWM_TOP)
 	sts		ICR1L,r16
 	ret
-
+init_timer2:
+	; cs2[2-0]=111   clkt2/1024
+	; WGM[2-0]=0 普通工作模式
+	; TOV2 = 1 使能T2溢出中断
+	ldi		r16,0
+;	out		TCCR2A,r16
+	sts		TCCR2A,r16
+	ldi		r16,0b00000111
+;	out		TCCR2B,r16
+	sts		TCCR2B,r16
+	ldi		r16,1
+;	out		TIMSK2,r16
+	sts		TIMSK2,r16
+	ret
 init_adc7:
 ;ADMUX[REFS1:REFS0:ADLAR: - :MUX3:MUX2:MUX1:MUX0]
 	ldi		r16,(1<<REFS1)+(1<<REFS0)+(1<<MUX2)+(1<<MUX1)+(1<<MUX0)
@@ -663,11 +659,18 @@ init_adc7:
 	sts		ADCSRA,r16
 ;ADCSRB[ - : ACME : - : - : - :ADTS2:ADTS1:ADTS0]
 	sts		ADCSRB,zero
+	ldi		r18,0
+	ldi		r19,0
+	rcall	eep_read
+	inc		r18
+	sts		mem_lagging_volt,r16
+	rcall	eep_read
+	sts		mem_lagging_volt+1,r16
 	ret
 
 check_battery:
 ;	sbi		GPIOR0,enabled_water_pump
-	ret
+;	ret
 	ldi		r16,5
 	cp		battery_check_cnt,r16
 	brcs	check_battery_exit
@@ -683,23 +686,33 @@ check_battery:
 	lds		r16,ADCL
 	lds		r17,ADCH
 
-;	sbi		PORTD,WATER_PUMP
-;	rcall	short_delay
-;	cbi		PORTD,WATER_PUMP
-;	rcall	short_delay
+
 	ldi		r18,low(PROTECT_VOLT)
 	ldi		r19,high(PROTECT_VOLT)
 	cp		r16,r18
 	cpc		r17,r19
-	brcc	cb_1
+	brcs	cb_low_power
+
+	lds		r18,mem_lagging_volt
+	lds		r19,mem_lagging_volt+1
+	cp		r16,r18
+	cpc		r17,r19
+	brcc	cb_power_restore
+	sbi		GPIOR0,lagging
+	rjmp	check_battery_exit
+
+cb_low_power:
 	cbi		GPIOR0,enabled_water_pump
 	cbi		PORTD,WATER_PUMP
 	sbi		GPIOR0,power_failed
 	rjmp	check_battery_exit
-cb_1:
+cb_power_restore:
 	sbi		GPIOR0,enabled_water_pump
 	cbi		GPIOR0,power_failed
+	cbi		GPIOR0,lagging
 check_battery_exit:
+
+	
 	ret
 ;  a     b
 ; --- = ---
@@ -1009,22 +1022,66 @@ sb_4:
 	brne	sb_fd
 
 	ret
+detect30:
+	ldi		r17,50
+	ldi		r16,40
+d30_start:
+	sbis	GPIOR0,rcp0_cycle
+	rjmp	d30_start
+	cbi		GPIOR0,rcp0_cycle
+
+	movw	r18,rcp0_l
+	
+
+	; if(r20:r21 > RCP_LOW && r20:r21 < RCP_HIGH) goto int0_rcp_ready
+	subi	r18, low(DETECT_SIGNAL_L)
+	sbci	r19,high(DETECT_SIGNAL_L)
+	subi	r18, low(DETECT_SIGNAL_H-DETECT_SIGNAL_L)
+	sbci	r19,high(DETECT_SIGNAL_H-DETECT_SIGNAL_L)
+	brcc	d30_1
+	dec		r16
+	and 	r16,r16
+	breq	d30_2
+d30_1:
+	dec		r17
+	and		r17,r17
+	breq	d30_exit
+	rjmp	d30_start
+d30_2:
+	rcall	set_v9
+	rjmp	infinity
+d30_exit:
+	ret
+
+set_v9:
+	cli
+	lds		r16,ADCL
+	lds		r17,ADCH
+	ldi		r18,0
+	ldi		r19,0
+	rcall	eep_write
+	inc		r18
+	mov		r16,r17
+	rcall	eep_write
+	rcall	start_beep
+	rcall	short_delay
+	rcall	start_beep
+	rcall	short_delay
+	rcall	start_beep
+	
+	ret
 
 
 save_word:
-	lds		r18,mem_debug_idx
-	cpi		r18,100
-	brcc	sword_exit
-	ldi		r26,low(mem_debug_data)
-	ldi		r27,high(mem_debug_data)
-	add		r26,r18
-	adc		r27,zero
-	st		X+,r16
-	st		X,r17
-	inc		r18
-	inc		r18
-	sts		mem_debug_idx,r18
-sword_exit:
+	cli
+	ldi		r18,0
+	ldi		r19,0
+	mov		r16,rcp0_l
+	rcall	eep_write
+	ldi		r18,1
+	ldi		r19,0
+	mov		r16,rcp0_h
+	rcall	eep_write
 	ret
 
 data_to_eep:
