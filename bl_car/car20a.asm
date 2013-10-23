@@ -103,6 +103,7 @@ rcp_ready1:
 .def	pwm_duty		= r14
 .def	tcnt2h			= r15
 
+.def	state_index		= r7
 ; memories definition
 .equ	mem_eep_addr	= 0x0070
 .equ	mem_eep_data	= 0x0071
@@ -4441,6 +4442,7 @@ watch_dog:
 	rcall	beep_b
 	rcall	beep_c
 	rjmp	infinity
+
 .def	r_temp1	= r16
 .def	r_temp2 = r17
 .def	r_temp3 = r18

@@ -1,3 +1,8 @@
+; 产品编号: CB015
+; 编号日期: 2013-6-6
+; 修改号： 1
+; 修改日期：2013-7-1
+
 ; fireboat.asm
 ; 关闭了电压保护
 ;        +---------+         +---------+
@@ -33,6 +38,10 @@
 ;   增加标记 lagging. 表示马达正在缓慢转动。
 ; 3 9V电压马达停转保护不变
 ; 4 电压取样该为 47k:4.7k
+
+; 2013-7-1
+; 1 修改水泵保护为，当电压低于10.2伏时，水泵同时停止
+
 .include "m48def.inc"
 
 .def	zero		= r0
@@ -671,6 +680,9 @@ init_adc7:
 check_battery:
 ;	sbi		GPIOR0,enabled_water_pump
 ;	ret
+;sbi		GPIOR0,lagging
+;ret
+
 	ldi		r16,5
 	cp		battery_check_cnt,r16
 	brcs	check_battery_exit
@@ -699,6 +711,10 @@ check_battery:
 	cpc		r17,r19
 	brcc	cb_power_restore
 	sbi		GPIOR0,lagging
+; rev 1
+	cbi		GPIOR0,enabled_water_pump
+	cbi		PORTD,WATER_PUMP
+
 	rjmp	check_battery_exit
 
 cb_low_power:

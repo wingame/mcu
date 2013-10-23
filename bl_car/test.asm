@@ -3,7 +3,7 @@
 ; all P FET close(1) if RCP    high
 ; all N FET open(0) if RCP low
 
-.include "m8def.inc"
+.include "m48def.inc"
 ;.include "../brushless/18_3p.inc"
 ;.include "../brushless/t50.inc"
 
@@ -41,20 +41,32 @@ mem_temp1:		.byte 1
 ; When multiple interrupts are pending, the vectors are executed from top
 ; (ext_int0) to bottom.
 	rjmp	reset
-	nop		;ext_int0
-	nop		; ext_int1
-	nop		; t2oc_int
-	nop		;rjmp	t2ovfl_int
-	nop		; icp1_int
-	nop		;t1oca_int
-	nop		; t1ocb_int
-	nop		;t1ovfl_int
-	nop		;t0ovfl_int
-	nop		; spi_int
-	nop		; urxc
-	nop		; udre
-	nop		; utxc
-
+	nop					;1.equ	INT0addr=$001	; External Interrupt0 Vector Address
+	nop					;2.equ	INT1addr=$002	; External Interrupt1 Vector Address
+	
+	nop					;3 Pin Change Interrupt Request 0
+	nop					;4 Pin Change Interrupt Request 1
+	nop					;5 Pin Change Interrupt Request 2
+	nop							;6 Watchdog Time-out Interrupt
+	nop				;7 Timer/Counter2 Compare Match A
+	reti				;8 Timer/Counter2 Compare Match B
+	nop					;9 Timer/Counter2 Overflow
+	reti					;a Timer/Counter1 Capture Event
+	nop				;b Timer/Counter1 Compare Match A
+	reti				;c Timer/Coutner1 Compare Match B
+	nop					;d Timer/Counter1 Overflow
+	nop				;e Timer/Counter0 Compare Match A
+	nop				;f Timer/Counter0 Compare Match B
+	nop					;10 Timer/Counter0 Overflow
+	nop						;11 SPI Serial Transfer Complete
+	nop					;12 USART Rx Complete
+	nop					;13 USART, Data Register Empty
+	nop					;14 USART, Tx Complete
+	nop						;15 ADC Conversion Complete
+	nop					;16 EEPROM Ready
+	nop					;17 Analog Comparator
+	nop						;18 2-wire Serial Interface
+	reti					;19 Store Program Memory Ready
 
 reset:
 	clr	zero
@@ -65,214 +77,53 @@ reset:
 	out	SPH, ZH
 	out	SPL, ZL
 
-	sbi		DDRD,CCLK
-	sbi		DDRD,CDTI
-	sbi		DDRD,CSN
-	rcall	sdelay
 
-	sbi		PORTD,CCLK
-	sbi		PORTD,CDTI
-	sbi		PORTD,CSN
+;ext int
+;	ldi		r16,(1<<INT1)+(1<<INT0)
+;	ldi		r16,(1<<INT0)
+	clr		r16
+	out		EIMSK,r16
 
-	
-	ldi		r16,1
-	sts		mem_addr,r16
-	ldi		r16,0b00000010
-	sts		mem_data,r16
-	rcall	send
-	
-	
-	rjmp	$
-	; clk
+	sbi		DDRD,5
 
-send:
-	lds		r18,mem_addr
-	andi	r18,0b00111111		; C0C1 = 00
-	ori		r18,0b00100000		; R/W  = 1
-	cbi		PORTD,CSN
-	rcall	_send
-;	sbi		PORTD,CSN
-;	rcall	sdelay
-;	cbi		PORTD,CSN
-	lds		r18,mem_data
-	rcall	_send
-	rcall	sdelay
-	sbi		PORTD,CSN
-	ret
-_send:
-	clr		r19
-s2:
-	lsl		r18
-	rcall	signal_out
-	inc		r19
-	cpi		r19,8
-	brne	s2
-	ret
-signal_out:
-	cbi		PORTD,CCLK
-	brcs	so_1
-	cbi		PORTD,CDTI
-	rjmp	so_2
-so_1:
-	sbi		PORTD,CDTI
-so_2:
-	rcall	sdelay
-	sbi		PORTD,CCLK
-	rcall	sdelay
-	cbi		PORTD,CCLK
+	rcall	long_delay
+	sbi		PORTD,5
+	rcall	long_delay
+	cbi		PORTD,5
+	rcall	long_delay
+	sbi		PORTD,5
+	rcall	long_delay
+
+	sei
+loop:
+	sbi		PORTD,5
+	rcall	short_delay
+	cbi		PORTD,5
+	rcall	long_delay
+	rjmp	loop
+
+
+short_delay:
+	ldi		r17,255
+d1:
+	ldi		r16,255
+d2:
+	dec		r16
+	brne	d2
+	dec		r17
+	brne	d1
 	ret
 
 long_delay:
-	ldi		r17,255
+	ldi		r16,50
+	sts		mem_temp1,r16
 ld_1:
-	rcall	delay256
-	dec		r17
-	and		r17,r17
+	rcall	short_delay
+	lds		r16,mem_temp1
+	dec		r16
+	sts		mem_temp1,r16
 	brne	ld_1
-	
-	lds		r16,mem_temp
-	dec		r16
-	sts		mem_temp,r16
-	and		r16,r16
-	brne	long_delay
-	
 	ret
-delay256:
-	ldi		r16,255
-d256_1:
-	dec		r16
-	and		r16,r16
-	brne	d256_1
-	ret
-
-sdelay:			; 25
-	clr		r16		;1
-sd_1:
-	inc		r16		;1
-	cpi		r16,5	;1
-	brne	sd_1	;2
-					; 4 X 5 =20
-	ret				;4
-
-ddd:
-	cbi		PORTD,CSN
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; C1
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 1
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; C0
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 2
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	sbi		PORTD,CDTI		; R/W
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 3
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; A4
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 4
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; A3
-	rcall	sdelay
-	sbi		PORTD,CCLK		;5
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; A2
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 6
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; A1
-	rcall	sdelay
-	sbi		PORTD,CCLK		;7
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; A0
-	rcall	sdelay
-	sbi		PORTD,CCLK		; 8
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; D7
-	rcall	sdelay
-	sbi		PORTD,CCLK		;9
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; D6
-	rcall	sdelay
-	sbi		PORTD,CCLK		;10
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; D5
-	rcall	sdelay
-	sbi		PORTD,CCLK		;11
-	rcall	sdelay
 	
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; D4
-	rcall	sdelay
-	sbi		PORTD,CCLK		;12
-	rcall	sdelay
-	
-	cbi		PORTD,CCLK
-	cbi		PORTD,CDTI		; D3
-	rcall	sdelay
-	sbi		PORTD,CCLK		;13
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	sbi		PORTD,CDTI		; D2
-	rcall	sdelay
-	sbi		PORTD,CCLK		;14
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	sbi		PORTD,CDTI		; D1
-	rcall	sdelay
-	sbi		PORTD,CCLK		;15
-	rcall	sdelay
-
-	cbi		PORTD,CCLK
-	sbi		PORTD,CDTI		; D0
-	rcall	sdelay
-	sbi		PORTD,CCLK		;16
-	rcall	sdelay
-
-	sbi		PORTD,CSN
-
-.if  1==2
-	sbi		PORTD,CSN
-	cbi		PORTD,CCLK
-	sbi		PORTD,CDTI
-
-	ldi		r16,30
-	sts		mem_temp,r16
-	rcall	long_delay
-	cbi		PORTD,CSN
-	sbi		PORTD,CCLK
-	cbi		PORTD,CDTI
-.endif
-	ldi		r16,30
-	sts		mem_temp,r16
-	rcall	long_delay
-	
-	rjmp	ddd
-
 
 .exit

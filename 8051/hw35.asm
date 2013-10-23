@@ -2723,7 +2723,7 @@ X14d5:	ret			; 14d5   22         "
 ;
 endif
 auto_detect_rcp:
-; 43h,52h,53h will be reset later, so it's uneffect by using here
+; 43h,52h,53h will be reset later, so it's safety by being used here
 	mov		43h,#50
 adr_1:
 	jnb		rcp_t0_ready,$

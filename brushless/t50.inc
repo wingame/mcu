@@ -41,11 +41,14 @@
 .equ	STATE_B		= (1<<cpFET)+(1<<bnFET)
 .equ	STATE_C		= (1<<cpFET)
 
-.equ	SOUND_ON	= STATE_3
-.equ	SOUND_OFF	= STATE_4
+.equ	SOUND_ON1	= STATE_1
+.equ	SOUND_OFF1	= STATE_2
+.equ	SOUND_ON2	= STATE_3
+.equ	SOUND_OFF2	= STATE_4
 .equ	BRAKE_ON	= (1<<anFET)+(1<<bnFET)+(1<<cnFET)		; Default = 0b00001011
 .equ	BRAKE_OFF	= 0
 
 
-.equ	P_CHARGE	= BP_CHARGE
+.equ	P_CHARGE1	= CP_CHARGE
+.equ	P_CHARGE2	= BP_CHARGE
 ;.equ	P_CHARGE	= 0

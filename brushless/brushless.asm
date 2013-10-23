@@ -3,7 +3,7 @@
 ; 重新设计程序结构
 
 .include "m8def.inc"
-.include "18_3p.inc"
+.include "18_3p_t50.inc"
 ;.include "t50.inc"
 
 .equ		F_CPU		= 16

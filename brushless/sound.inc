@@ -1,26 +1,27 @@
+.equ	SOUND_VOL =	 10	;SOUND_VOL/255
 beep_c:
-	ldi		r20,SOUND_ON
-	ldi		r21,SOUND_OFF
-	ldi		r_temp1,9
-	ldi		r_temp2,7
+	ldi		r20,SOUND_ON1
+	ldi		r21,SOUND_OFF1
+	ldi		r_temp1,18
+	ldi		r_temp2,14
 	rjmp	beep_cycle
 beep_b:
-	ldi		r20,SOUND_ON
-	ldi		r21,SOUND_OFF
-	ldi		r_temp1,12
-	ldi		r_temp2,5
+	ldi		r20,SOUND_ON1
+	ldi		r21,SOUND_OFF1
+	ldi		r_temp1,24
+	ldi		r_temp2,10
 	rjmp	beep_cycle
 beep_a:
-	ldi		r20,SOUND_ON
-	ldi		r21,SOUND_OFF
-	ldi		r_temp1,15
-	ldi		r_temp2,4
+	ldi		r20,SOUND_ON1
+	ldi		r21,SOUND_OFF1
+	ldi		r_temp1,30
+	ldi		r_temp2,8
 	rjmp	beep_cycle
 
 beep_cycle:
 ; P capacity charge
-.if	P_CHARGE>0
-	ldi		r_temp4,P_CHARGE
+.if	P_CHARGE1>0
+	ldi		r_temp4,P_CHARGE1
 	out		PORTD,r_temp4
 	ldi		r_temp4,50
 p_charge_1:
@@ -30,7 +31,7 @@ p_charge_1:
 .endif
 beep_cycle_1:
 
-	ldi		r27,120				; cycle times
+	ldi		r27,255				; cycle times
 beep_s:
 	mov		r26,r_temp1
 beep_0:
@@ -74,45 +75,88 @@ d2:
 	brne	d1
 	ret
 
-test_fet:
-	ldi		r_temp1,15
-	ldi		r_temp2,4
-	rjmp	beep_cycle
+beep_delay:
+	push	r_temp1
+	mov		r_temp1,r_temp2		; 8
+bd1:
+	dec		r_temp1
+	brne	bd1
+	pop		r_temp1
+	ret
 
-test_fets:
-	ldi		r20,STATE_1
-	ldi		r21,STATE_2
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	
-	ldi		r20,STATE_3
-	ldi		r21,STATE_4
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	
-	ldi		r20,STATE_5
-	ldi		r21,STATE_6
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	
-	ldi		r20,STATE_7
-	ldi		r21,STATE_8
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	
-	ldi		r20,STATE_9
-	ldi		r21,STATE_a
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	
-	ldi		r20,STATE_b
-	ldi		r21,STATE_c
-	rcall	test_fet
-	rcall	short_delay
-	rcall	short_delay
-	rjmp	test_fets
+
+
+sound_d:
+	ldi		r_temp2,8
+	rjmp	b_cycle
+sound_e:
+	ldi		r_temp2,6
+	rjmp	b_cycle
+sound_f:
+	ldi		r_temp2,4
+
+
+b_cycle:
+	inc		state_index
+	mov		r_temp1,state_index
+	cpi		r_temp1,6
+	brcs	bc_start
+	clr		state_index
+bc_start:
+	rcall	set_state
+	ldi		r_temp1,low(500)
+	sts		mem_temp1,r_temp1
+	ldi		r_temp1,high(500)
+	sts		mem_temp1+1,r_temp1
+
+
+bc_1:
+.if	P_CHARGE1>0
+p_charge_3:
+	ldi		r_temp1,P_CHARGE2
+	out		PORTD,r_temp1
+	ldi		r_temp1,5
+p_charge_4:
+	dec		r_temp1
+	brne	p_charge_4
+	out		PORTD,r_temp1		; r_temp1 = 0
+.endif
+
+	ldi		r_temp1,SOUND_VOL
+	out		PORTD,state_on
+bc_2:
+	rcall	beep_delay
+	dec		r_temp1
+	brne	bc_2
+	out		PORTD,state_off
+	ldi		r_temp1,256-SOUND_VOL
+bc_3:
+	rcall	beep_delay
+	dec		r_temp1
+	brne	bc_3
+
+
+	lds		r_temp1,mem_temp1
+	dec		r_temp1
+	sts		mem_temp1,r_temp1
+	brne	bc_1
+	lds		r_temp1,mem_temp1+1
+	and		r_temp1,r_temp1
+	breq	bc_exit
+	dec		r_temp1
+	sts		mem_temp1+1,r_temp1
+	rjmp	bc_1
+bc_exit:
+	ret
+set_state:
+	clr		r0
+
+	ldi		yl,low(mem_states)
+	ldi		yh,high(mem_states)
+	mov		r_temp1,state_index
+	add		r_temp1,r_temp1
+	add		yl,r_temp1
+	adc		yh,r0
+	ld		state_on,Y+
+	ld		state_off,Y
+	ret
