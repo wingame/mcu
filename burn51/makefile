@@ -3,8 +3,8 @@
 CC=asemw
 #BATTERY TYPE 1:NIHM 2:LIPO
 
-CFLAG=/COLUMNS /D:NO_UART:1 /D:BATTERY_TYPE:1
-TARGET = env_case
+CFLAG=/COLUMNS 
+TARGET = burn
 #TARGET = phone_charger
 #TARGET = exercise
 #TARGET = test
